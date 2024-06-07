@@ -40,13 +40,8 @@ func connect(host, port, password string) (*redis.Client, error) {
 	return conn, nil
 }
 
-func(client Client) Save(ctx context.Context, botName, msg string) error {
-	err := client.push(ctx, botName, msg)
-	return err
-}
-
-func (client Client) push(ctx context.Context,botName, message string) error {
-	_, err := client.conn.LPush(ctx, botName, message).Result()
+func (client Client) push(ctx context.Context, key string, value interface{}) error {
+	_, err := client.conn.LPush(ctx, key, value).Result()
 	return err
 }
 
@@ -60,4 +55,26 @@ func (client Client) Receive(ctx context.Context, botName string, msgs chan<- st
 			msgs<- msg
 		}
 	}
-} 
+}
+
+func (client Client) Topic(ctx context.Context, hashTopic string) (string, error) {
+	res, err := client.conn.Get(ctx, hashTopic).Result()
+	if err != nil && err == redis.Nil {
+		err = nil
+		res = ""
+	}
+	return res, err
+}
+
+func (client Client) NewTopic(ctx context.Context, hashTopic string, topicID int) error {
+	err := client.push(ctx,hashTopic, topicID)
+	if err != nil {
+		return err
+	}
+	return client.addTopicToList(ctx, hashTopic)
+}
+
+func (client Client) addTopicToList(ctx context.Context, hashTopic string) error {
+	return nil
+}
+

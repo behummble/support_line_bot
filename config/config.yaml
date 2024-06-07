@@ -1,6 +1,7 @@
 redis:
    host: 127.0.0.1
    port: 6379
+   topic_list: supp_topicList
 bot:
-   name: csupp_test
+   name: csupp_bot
    timeout: 10
