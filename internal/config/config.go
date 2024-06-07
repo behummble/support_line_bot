@@ -24,6 +24,7 @@ type BotConfig struct {
 	Token string `yaml:"token" env:"BOT_TOKEN"`
 	UpdateTimeout int `yaml:"timeout" env-default:"10"`
 	Name string `yaml:"name"`
+	ChatID int64 `yaml:"chatID" env:"CHAT_ID"`
 }
 
 func MustLoad() *Config {

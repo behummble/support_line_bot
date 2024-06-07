@@ -20,6 +20,7 @@ func main() {
 		config.Redis.Port,
 		config.Redis.Password,
 		config.Bot.UpdateTimeout,
+		config.Bot.ChatID,
 	)
 	app.Bot.StartListenUpdates(config.Bot.Name)	
 }

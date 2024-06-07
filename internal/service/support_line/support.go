@@ -2,42 +2,32 @@ package supportline
 
 import (
 	"context"
-	"crypto/sha1"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"time"
-
 	"gopkg.in/telebot.v3"
-)
-
-const (
-	errorMessage = "Sorry, something went wrong, try to repeat the request later"
-	startMessage = "Hi, %s"
-	cantCreateTopic = "К сожалению, не смогли адресовать сообщение в службу поддержки. Попробуйте обратиться по команде ниже"
-	sendMessageToSupport = "Передал ваше сообщение в службу поддержки, они ответят в ближайшее время"
-)
-
-const (
-	commandNotFound = "Can`t find command %s"
+	"github.com/robfig/cron"
 )
 
 var (
-	inLine = &telebot.ReplyMarkup{ResizeKeyboard: true,}
-	btnHelp = inLine.Text("✍ Связаться с поддержкой")
+	topicKey = "topic:{%d}"
 )
 
 type DB interface {
-	NewTopic(ctx context.Context, hashTopic string, topicID int) error
-	Topic(ctx context.Context, hashTopic string) (string, error)
+	NewTopic(ctx context.Context, topic string, topicData string) error
+	Topic(ctx context.Context, topic string) (string, error)
+	AllTopics(ctx context.Context) ([]string, error)
+	ClearTopics(ctx context.Context) error
 }
 
 type SupportService struct {
 	log *slog.Logger
 	bot *telebot.Bot
 	db DB
+	chatID int64
+	cron *cron.Cron
 }
 
 type Message struct {
@@ -48,7 +38,20 @@ type Message struct {
 	Payload string
 }
 
-func New(log *slog.Logger, db DB, token string, timeout int) *SupportService {
+type TopicData struct {
+	BotID int64
+	ChatID int64
+	UserID int64
+	TopicID int64
+}
+
+type SupportData struct {
+	ChatID int64
+	TopicID int64
+	Text string
+}
+
+func New(log *slog.Logger, db DB, token string, timeout int, chatID int64) *SupportService {
 	bot, err := telebot.NewBot(
 		telebot.Settings{
 			Token: token,
@@ -60,10 +63,17 @@ func New(log *slog.Logger, db DB, token string, timeout int) *SupportService {
 		panic(err)
 	}
 
+	loc, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		panic(err)
+	}
+
 	return &SupportService{
 		log,
 		bot,
 		db,
+		chatID,
+		cron.NewWithLocation(loc),
 	}
 }
 
@@ -74,24 +84,25 @@ func(sbot *SupportService) ProcessMessage(msg string) {
 	}
 	err = sbot.handleMessage(telegramMessage)
 	if err != nil {
-		sbot.manualContactingSupport(telegramMessage.ChatID)
-	} else {
-		sbot.bot.Send(telebot.ChatID(telegramMessage.ChatID), sendMessageToSupport)
+		sbot.log.Error("HandleMessage", err)
 	}
 }
 
-func(sbot *SupportService) handleMessage(telegramMessage Message) error {
-	hash, err := hashTopic(telegramMessage.ChatID, telegramMessage.UserID)
-	if err != nil {
-		return err
-	}
+func(sbot *SupportService) RemoveTopics() {
+	sbot.cron.AddFunc("@midnight", sbot.clearTopicsFunc())
+	sbot.cron.Start()
+}
 
-	topic, err := sbot.db.Topic(context.Background(), hash)
+func(sbot *SupportService) handleMessage(telegramMessage Message) error {
+	topic, err := sbot.db.Topic(
+		context.Background(), 
+		fmt.Sprintf(topicKey, telegramMessage.UserID))
 	if err != nil {
 		return err
 	}
 
 	if topic != "" {
+		
 		return sbot.transferMessageToTopic(topic, telegramMessage)
 	} else {
 		return sbot.createTopic(telegramMessage)
@@ -104,43 +115,21 @@ func parseMessage(msg string) (Message, error) {
 	return res, err
 }
 
-func (sbot *SupportService) manualContactingSupport(chatID int64) {
-	inLine.Inline(
-		inLine.Row(btnHelp),
-	) 
-	_, err := sbot.bot.Send(telebot.ChatID(chatID), cantCreateTopic, inLine)
-	if err != nil {
-		sbot.log.Error("SendInlineCommand", err)
-	}
-}
-
-func hashTopic(chatID, userID int64) (string, error) {
-	h := sha1.New()
-    _, err := h.Write([]byte(fmt.Sprintf("%d", chatID + userID)))
-	if err == nil {
-    	sha1_hash := hex.EncodeToString(h.Sum(nil))
-		return sha1_hash, nil
-	}
+func (sbot *SupportService) transferMessageToTopic(topicID int, telegramMessage Message) error {
 	
-	return "", err
-}
-
-func (sbot *SupportService) transferMessageToTopic(topic string, telegramMessage Message) error {
-	id, err := strconv.ParseInt(topic, 10, 64)
-	if err != nil {
-		return err
+	msg := &telebot.Message{
+		ThreadID: int(id),
+		Chat: &telebot.Chat{ID: telegramMessage.ChatID},
 	}
-	group := telebot.ChatID(id)
-	//if telegramMessage.Payload != "" {
-	_, err = sbot.bot.Send(group, telegramMessage.Payload)
+
+	_, err = sbot.bot.Reply(msg, telegramMessage.Payload)
 	return err	
-	//}
 }
 
 func (sbot *SupportService) createTopic(telegramMessage Message) error {
 	chat := &telebot.Chat{
-		ID: telegramMessage.ChatID,
-		Private: true,
+		ID: sbot.chatID,
+		Private: false,
 	}
 
 	topic, err := sbot.bot.CreateTopic(chat, generateTopic(telegramMessage.UserName))
@@ -148,23 +137,86 @@ func (sbot *SupportService) createTopic(telegramMessage Message) error {
 		return err
 	}
 
-	hash, err := hashTopic(telegramMessage.ChatID, telegramMessage.UserID)
+	topicData, err := prepareTopicData(telegramMessage, int64(topic.ThreadID))
 	if err != nil {
 		return err
 	}
 
 	err = sbot.db.NewTopic(
 		context.Background(),
-		hash,
-		topic.ThreadID,
+		fmt.Sprintf(topicKey, telegramMessage.UserID),
+		topicData,
 	)
-
-	return err
+	if err != nil {
+		return err
+	} else {
+		return sbot.transferMessageToTopic(topic.)
+	}
 }
 
 func generateTopic(userName string) *telebot.Topic {
 	return &telebot.Topic{
-			Name: fmt.Sprintf("Chat with %s", userName),
+			Name: userName,
 			IconColor: 0,
 		}
+}
+
+func prepareTopicData(msg Message, topicID int64) (string, error) {
+	data := TopicData{
+		BotID: msg.BotID,
+		ChatID: msg.ChatID,
+		UserID: msg.UserID,
+		TopicID: topicID,
+	}
+
+	res, err := json.Marshal(data)
+	return string(res), err
+}
+
+func (sbot *SupportService) clearTopicsFunc() func() {
+	return func() {
+		sbot.deleteTopicsInService()
+		sbot.deleteTopicsInDB()
+	}
+}
+
+func (sbot *SupportService) deleteTopicsInService() {
+	topics, err := sbot.db.AllTopics(context.Background())
+	if err != nil {
+		sbot.log.Error("GetAllTopics", err)
+		return
+	}
+	
+	for _, topic := range topics {
+		topicData, err := parseTopic(topic)
+		if err != nil {
+			sbot.log.Error("ExecuteIDInTopicKey", err)
+			continue
+		}
+		chat := &telebot.Chat{
+			ID: topicData.ChatID,
+		}
+		teleTopic := &telebot.Topic {
+			ThreadID: int(topicData.TopicID),
+		}
+		err = sbot.bot.CloseTopic(
+			chat,
+			teleTopic)
+		if err != nil {
+			sbot.log.Error("CloseTopic", err)
+		}
+	}
+}
+
+func (sbot *SupportService) deleteTopicsInDB() {
+	err := sbot.db.ClearTopics(context.Background())
+	if err != nil {
+		sbot.log.Error("SheduledFlushTopics", err)
+	}
+}
+
+func parseTopic(data string) (TopicData, error) {
+	var topic TopicData
+	err := json.Unmarshal([]byte(data), &topic)
+	return topic, err
 }

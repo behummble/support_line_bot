@@ -23,6 +23,43 @@ func New(log *slog.Logger, host, port, password string) (Client, error) {
 	return Client{log, conn}, nil
 }
 
+func (client Client) Topic(ctx context.Context, topic string) (string, error) {
+	res, err := client.conn.Get(ctx, topic).Result()
+	if err != nil && err == redis.Nil {
+		err = nil
+		res = ""
+	}
+	return res, err
+}
+
+func (client Client) Receive(ctx context.Context, botName string, msgs chan<- string) {
+	for {
+		messages, err := client.conn.BLPop(context.Background(), time.Second * 3, botName).Result()
+		if err != nil {
+			client.log.Error("PopMessage", err)
+		}
+		for _, msg := range messages {
+			msgs<- msg
+		}
+	}
+}
+
+func (client Client) NewTopic(ctx context.Context, topic string, topicData string) error {
+	err := client.push(ctx, topic, topicData)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (client Client) ClearTopics(ctx context.Context) error {
+	_, err := client.conn.FlushAll(ctx).Result()
+	return err
+}
+func (client Client) AllTopics(ctx context.Context) ([]string, error) {
+	return client.conn.Keys(ctx, "topic:*").Result()
+}
+
 func connect(host, port, password string) (*redis.Client, error) {
 	options := &redis.Options{
 		Addr: fmt.Sprintf("%s:%s", host, port),
@@ -44,37 +81,3 @@ func (client Client) push(ctx context.Context, key string, value interface{}) er
 	_, err := client.conn.LPush(ctx, key, value).Result()
 	return err
 }
-
-func (client Client) Receive(ctx context.Context, botName string, msgs chan<- string) {
-	for {
-		messages, err := client.conn.BLPop(context.Background(), time.Second * 3, botName).Result()
-		if err != nil {
-			client.log.Error("PopMessage", err)
-		}
-		for _, msg := range messages {
-			msgs<- msg
-		}
-	}
-}
-
-func (client Client) Topic(ctx context.Context, hashTopic string) (string, error) {
-	res, err := client.conn.Get(ctx, hashTopic).Result()
-	if err != nil && err == redis.Nil {
-		err = nil
-		res = ""
-	}
-	return res, err
-}
-
-func (client Client) NewTopic(ctx context.Context, hashTopic string, topicID int) error {
-	err := client.push(ctx,hashTopic, topicID)
-	if err != nil {
-		return err
-	}
-	return client.addTopicToList(ctx, hashTopic)
-}
-
-func (client Client) addTopicToList(ctx context.Context, hashTopic string) error {
-	return nil
-}
-

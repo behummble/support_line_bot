@@ -15,9 +15,10 @@ type Support struct {
 	log *slog.Logger
 	receiver MessageReceiver
 	supportService *supp.SupportService
+	
 }
 
-func New(log *slog.Logger,receiver MessageReceiver, botService *supp.SupportService) (*Support) {
+func New(log *slog.Logger, receiver MessageReceiver, botService *supp.SupportService) (*Support) {
 	return &Support{log, receiver, botService}
 } 
 
@@ -28,4 +29,8 @@ func(support *Support) StartListenUpdates(botName string) {
 		msg := <- msgs
 		support.supportService.ProcessMessage(msg)
 	}
+}
+
+func (support *Support) RemoveTopics() {
+	support.supportService.RemoveTopics()
 }
