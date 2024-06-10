@@ -5,3 +5,7 @@ redis:
 bot:
    name: csupp_bot
    timeout: 10
+server:
+   host: localhost
+   port: 8080
+   path: /support

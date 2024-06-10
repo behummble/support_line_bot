@@ -11,6 +11,7 @@ import (
 type Config struct {
 	Redis RedisConfig `yaml:"redis"`
 	Bot BotConfig `yaml:"bot"`
+	Server ServerConfig `yaml:"server"`
 }
 
 type RedisConfig struct {
@@ -25,6 +26,12 @@ type BotConfig struct {
 	UpdateTimeout int `yaml:"timeout" env-default:"10"`
 	Name string `yaml:"name"`
 	ChatID int64 `yaml:"chatID" env:"CHAT_ID"`
+}
+
+type ServerConfig struct {
+	Host string `yaml:"host"`
+	Port int `yaml:"port"`
+	Path string `yaml:"path"`
 }
 
 func MustLoad() *Config {

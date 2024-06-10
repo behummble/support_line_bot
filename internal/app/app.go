@@ -12,7 +12,7 @@ type App struct {
 	Bot *appsupport.Support
 }
 
-func New(log *slog.Logger, dbHost, dbPort, dbPassword, token string, timeout int, chatID int64) App {
+func New(log *slog.Logger, token, dbHost, dbPort, dbPassword string, timeout int, chatID int64) App {
 	db, err := redis.New(log, dbHost, dbPort, dbPassword)
 	if err != nil {
 		panic(err)

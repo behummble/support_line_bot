@@ -4,9 +4,9 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/joho/godotenv"
-	"github.com/behummble/support_line_bot/internal/config"
 	"github.com/behummble/support_line_bot/internal/app"
+	"github.com/behummble/support_line_bot/internal/config"
+	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -22,7 +22,12 @@ func main() {
 		config.Bot.UpdateTimeout,
 		config.Bot.ChatID,
 	)
-	app.Bot.StartListenUpdates(config.Bot.Name)	
+	go app.Bot.RemoveTopics()
+	go app.Bot.ListenUpdates(config.Bot.Name)
+	app.Bot.ListenSupportMessages(
+		config.Server.Host, 
+		config.Server.Port,
+		config.Server.Path)
 }
 
 func initLog() *slog.Logger {

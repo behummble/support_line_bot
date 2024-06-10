@@ -44,12 +44,13 @@ func (client Client) Receive(ctx context.Context, botName string, msgs chan<- st
 	}
 }
 
-func (client Client) NewTopic(ctx context.Context, topic string, topicData string) error {
-	err := client.push(ctx, topic, topicData)
+func (client Client) NewTopic(ctx context.Context, topicUserKey, topicSupportKey string, topicData string) error {
+	err := client.set(ctx, topicUserKey, topicData)
 	if err != nil {
-		return err
+		client.log.Error("CreateTopicUser", err)
 	}
-	return nil
+	err = client.set(ctx, topicSupportKey, topicData)
+	return err
 }
 
 func (client Client) ClearTopics(ctx context.Context) error {
@@ -77,7 +78,7 @@ func connect(host, port, password string) (*redis.Client, error) {
 	return conn, nil
 }
 
-func (client Client) push(ctx context.Context, key string, value interface{}) error {
-	_, err := client.conn.LPush(ctx, key, value).Result()
+func (client Client) set(ctx context.Context, key string, value interface{}) error {
+	_, err := client.conn.Set(ctx, key, value, 0).Result()
 	return err
 }
