@@ -163,12 +163,6 @@ func parseSupportMessage(msg []byte) (SupportMessage, error) {
 }
 
 func (sbot *SupportService) transferMessageToTopic(topicID int, telegramMessage Message) error {
-	/*msg := &telebot.Message{
-		ThreadID: topicID,
-		Chat: sbot.chat,
-		TopicMessage: true,
-	} */
-
 	opts := &telebot.SendOptions{
 		ThreadID: topicID,
 	}
@@ -178,6 +172,7 @@ func (sbot *SupportService) transferMessageToTopic(topicID int, telegramMessage 
 }
 
 func (sbot *SupportService) transferMessageToUser(chatID int64, payload string) error {
+	
 	_, err := sbot.bot.Send(telebot.ChatID(chatID), payload)
 	return err
 }

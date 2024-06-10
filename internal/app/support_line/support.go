@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"io"
 
 	"golang.org/x/net/websocket"
 
@@ -38,7 +37,7 @@ func(support *Support) ListenUpdates(botName string) {
 		msgs)
 	for {
 		msg := <- msgs
-		support.supportService.ProcessUserMessage(msg)
+		go support.supportService.ProcessUserMessage(msg)
 	}
 }
 
@@ -55,8 +54,11 @@ func (support *Support) ListenSupportMessages(host string, port int, path string
 }
 
 func(support *Support) supportMessage(ws *websocket.Conn) {
-	data, err := io.ReadAll(ws)
-	if err != nil {
+	var data []byte
+	err := websocket.Message.Receive(ws, &data)
+	if err == nil {
 		support.supportService.ProcessSupportMessage(data)
+	} else {
+		support.log.Error("HandleWebSocketMessage", err)
 	}
 }
