@@ -36,6 +36,7 @@ type Message struct {
 	UserID int64
 	UserName string
 	Payload string
+	MessageID int64
 }
 
 type TopicData struct {
@@ -167,6 +168,19 @@ func (sbot *SupportService) transferMessageToTopic(topicID int, telegramMessage 
 		ThreadID: topicID,
 	}
 
+	/*chat, err := sbot.bot.ChatByID(telegramMessage.ChatID)
+	if err != nil {
+		return err
+	}
+
+	msg := &telebot.Message{
+		ID: int(telegramMessage.MessageID), 
+		Chat: chat}
+
+	_, err = sbot.bot.Forward(
+		sbot.chat, 
+		msg, 
+		opts) */
 	_, err := sbot.bot.Send(sbot.chat, telegramMessage.Payload, opts)
 	return err
 }
