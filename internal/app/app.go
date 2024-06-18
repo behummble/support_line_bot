@@ -17,7 +17,17 @@ func New(log *slog.Logger, token, dbHost, dbPort, dbPassword string, timeout int
 	if err != nil {
 		panic(err)
 	}
-	botService := supportline.New(log, db, token, timeout, chatID)
+	bot, err := telebot.NewBot(
+		telebot.Settings{
+			Token: token,
+			Poller: &telebot.LongPoller{Timeout: time.Second * time.Duration(timeout)},
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	botService := supportline.New(log, db, chatID)
 	appsupport := appsupport.New(log, db, botService)
 	
 	return App{appsupport}

@@ -11,8 +11,9 @@ import (
 	supp "github.com/behummble/support_line_bot/internal/service/support_line"
 )
 
-var (
-	botMessages = "messages:{%s}"
+const (
+	userMessages = "/user/message"
+	supportMessages = "/support/message"
 )
 
 type MessageReceiver interface {
@@ -29,15 +30,12 @@ func New(log *slog.Logger, receiver MessageReceiver, botService *supp.SupportSer
 	return &Support{log, receiver, botService}
 } 
 
-func(support *Support) ListenUpdates(botName string) {
-	msgs := make(chan string)
-	go support.receiver.Receive(
-		context.Background(), 
-		fmt.Sprintf(botMessages, botName),
-		msgs)
-	for {
-		msg := <- msgs
-		go support.supportService.ProcessUserMessage(msg)
+func (support *Support) ListenMessages(host string, port int) {
+	http.Handle(userMessages, websocket.Handler(support.userMessage))
+	http.Handle(supportMessages, websocket.Handler(support.supportMessage))
+	err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), nil)
+	if err != nil {
+		panic("ListenAndServe: " + err.Error())
 	}
 }
 
@@ -45,15 +43,17 @@ func (support *Support) RemoveTopics() {
 	support.supportService.RemoveTopics()
 }
 
-func (support *Support) ListenSupportMessages(host string, port int, path string) {
-	http.Handle(path, websocket.Handler(support.supportMessage))
-	err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), nil)
-	if err != nil {
-		panic("ListenAndServe: " + err.Error())
+func (support *Support) userMessage(ws *websocket.Conn) {
+	var data []byte
+	err := websocket.Message.Receive(ws, &data)
+	if err == nil {
+		support.supportService.ProcessUserMessage(string(data))
+	} else {
+		support.log.Error("HandleWebSocketMessage", err)
 	}
 }
 
-func(support *Support) supportMessage(ws *websocket.Conn) {
+func (support *Support) supportMessage(ws *websocket.Conn) {
 	var data []byte
 	err := websocket.Message.Receive(ws, &data)
 	if err == nil {
