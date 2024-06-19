@@ -6,29 +6,28 @@ import (
 	appsupport "github.com/behummble/support_line_bot/internal/app/support_line"
 	"github.com/behummble/support_line_bot/internal/repo/db/redis"
 	"github.com/behummble/support_line_bot/internal/service/support_line"
+	"github.com/behummble/support_line_bot/internal/websocket/updates"
+	"github.com/behummble/support_line_bot/internal/config"
 )
 
 type App struct {
 	Bot *appsupport.Support
 }
 
-func New(log *slog.Logger, token, dbHost, dbPort, dbPassword string, timeout int, chatID int64) App {
-	db, err := redis.New(log, dbHost, dbPort, dbPassword)
-	if err != nil {
-		panic(err)
-	}
-	bot, err := telebot.NewBot(
-		telebot.Settings{
-			Token: token,
-			Poller: &telebot.LongPoller{Timeout: time.Second * time.Duration(timeout)},
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
+func New(log *slog.Logger, config *config.Config) App {
+	db, err := redis.New(
+		log, 
+		config.Redis.Host, 
+		config.Redis.Port, 
+		config.Redis.Password)
 
-	botService := supportline.New(log, db, chatID)
-	appsupport := appsupport.New(log, db, botService)
+	if err != nil {
+		panic(err)
+	}
 	
-	return App{appsupport}
+	botService := supportline.New(log, db, config.Bot.ChatID, config.Bot.UpdateTimeout)
+	router := updates.New(log, botService)
+	appsupport := appsupport.New(log, botService, router)
+	
+	return App{Bot: appsupport}
 }

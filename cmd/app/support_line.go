@@ -15,19 +15,10 @@ func main() {
 	config := config.MustLoad()
 	app := app.New(
 		log, 
-		config.Bot.Token, 
-		config.Redis.Host, 
-		config.Redis.Port,
-		config.Redis.Password,
-		config.Bot.UpdateTimeout,
-		config.Bot.ChatID,
+		config,
 	)
 	go app.Bot.RemoveTopics()
-	go app.Bot.ListenUpdates(config.Bot.Name)
-	app.Bot.ListenSupportMessages(
-		config.Server.Host, 
-		config.Server.Port,
-		config.Server.Path)
+	app.Bot.ListenMessages(config.Server.Host, config.Server.Port)
 }
 
 func initLog() *slog.Logger {
