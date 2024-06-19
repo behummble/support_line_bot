@@ -21,7 +21,6 @@ func New(log *slog.Logger, encryptedToken []byte, timeout int) (*Bot, error) {
 
 	client, err := newBotClient(token, timeout)
 	if err != nil {
-		log.Error("InitializeBot", err)
 		return nil, err
 	}
 

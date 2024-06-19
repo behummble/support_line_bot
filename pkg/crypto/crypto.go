@@ -3,6 +3,7 @@ package crypto
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"encoding/hex"
 	"os"
 	"errors"
 	"io"
@@ -62,6 +63,6 @@ func addPaddingBytes(data []byte) []byte {
     for i := 0; i < num; i++ {
         data = append(data, 0)
     }
-	
+
     return data
 }

@@ -27,11 +27,9 @@ type DB interface {
 
 type Support struct {
 	log *slog.Logger
-	bot *telebot.Bot
 	db DB
 	chatID int64
 	timeout int
-	chat *telebot.Chat
 	cron *cron.Cron
 }
 
@@ -58,7 +56,12 @@ func(support *Support) ProcessUserMessage(msg []byte) {
 	}
 
 	bot, err := bot.New(support.log, telegramMessage.BotToken, support.timeout)
-	
+
+	if err != nil {
+		support.log.Error("InitializeBot", err)
+		return
+	}
+
 	err = support.handleUserMessage(telegramMessage)
 	if err != nil {
 		support.log.Error("HandleMessage", err)
@@ -171,6 +174,7 @@ func (support *Support) createTopic(telegramMessage entity.UserMessage) error {
 		fmt.Sprintf(topicSupportKey, topic.ThreadID),
 		topicData,
 	)
+
 	if err != nil {
 		return err
 	} else {
@@ -234,8 +238,4 @@ func (sbot *Support) deleteTopicsInDB() {
 	if err != nil {
 		sbot.log.Error("SheduledFlushTopics", err)
 	}
-}
-
-func initBot(token []byte) {
-	
 }
