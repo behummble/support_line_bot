@@ -40,3 +40,27 @@ func newBotClient(token string, timeout int) (*telebot.Bot, error) {
 	)
 	return bot, err
 }
+
+func (bot *Bot) Token() string {
+	return bot.token
+}
+
+func (bot *Bot) ChatByID(chatID int64) (*telebot.Chat, error) {
+	return bot.client.ChatByID(chatID)
+}
+
+func (bot *Bot) Forward(to telebot.Recipient, msg telebot.Editable, opts ...interface{}) (*telebot.Message, error) {
+	return bot.client.Forward(to, msg, opts)
+}
+
+func (bot *Bot) Send(to telebot.Recipient, what interface{}, opts ...interface{}) (*telebot.Message, error) {
+	return bot.client.Send(to, what, opts)
+}
+
+func (bot *Bot) CreateTopic(chat *telebot.Chat, topic *telebot.Topic) (*telebot.Topic, error) {
+	return bot.client.CreateTopic(chat, topic)
+}
+
+func (bot *Bot) CloseTopic(chat *telebot.Chat, topic *telebot.Topic) error {
+	return bot.client.CloseTopic(chat, topic)
+}

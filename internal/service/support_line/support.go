@@ -11,6 +11,7 @@ import (
 	"github.com/behummble/support_line_bot/internal/service/bot"
 	"github.com/behummble/support_line_bot/internal/entity"
 	"github.com/behummble/support_line_bot/pkg/encoding"
+	"github.com/behummble/support_line_bot/pkg/crypto"
 )
 
 const (
@@ -62,7 +63,13 @@ func(support *Support) ProcessUserMessage(msg []byte) {
 		return
 	}
 
-	err = support.handleUserMessage(telegramMessage)
+	supportChat, err := bot.ChatByID(support.chatID)
+	if err != nil {
+		support.log.Error("InitializeChat", err)
+		return
+	}
+
+	err = support.handleUserMessage(telegramMessage, bot, supportChat)
 	if err != nil {
 		support.log.Error("HandleMessage", err)
 	}
@@ -75,7 +82,13 @@ func(support *Support) ProcessSupportMessage(msg []byte) {
 		return 
 	}
 
-	err = support.handleSupportMessage(supportMsg)
+	bot, err := bot.New(support.log, supportMsg.BotToken, support.timeout)
+	if err != nil {
+		support.log.Error("InitializeBot", err)
+		return
+	}
+
+	err = support.handleSupportMessage(supportMsg, bot)
 	if err != nil {
 		support.log.Error("HandleMessage", err)
 	}
@@ -86,7 +99,7 @@ func(support *Support) RemoveTopics() {
 	support.cron.Start()
 }
 
-func(support *Support) handleUserMessage(telegramMessage entity.UserMessage) error {
+func(support *Support) handleUserMessage(telegramMessage entity.UserMessage, bot *bot.Bot, supportChat *telebot.Chat) error {
 	topic, err := support.db.Topic(
 		context.Background(), 
 		fmt.Sprintf(topicUserKey, telegramMessage.UserID))
@@ -99,13 +112,13 @@ func(support *Support) handleUserMessage(telegramMessage entity.UserMessage) err
 		if err != nil {
 			return err
 		}
-		return support.transferMessageToTopic(topicData.TopicID, telegramMessage)
+		return support.transferMessageToTopic(topicData.TopicID, telegramMessage, bot, supportChat)
 	} else {
-		return support.createTopic(telegramMessage)
+		return support.createTopic(telegramMessage, bot, supportChat)
 	}
 }
 
-func(support *Support) handleSupportMessage(supportMsg entity.SupportMessage) error {
+func(support *Support) handleSupportMessage(supportMsg entity.SupportMessage, bot *bot.Bot) error {
 	topicInfo, err := support.db.Topic(
 		context.Background(), 
 		fmt.Sprintf(topicSupportKey, supportMsg.TopicID))
@@ -119,51 +132,56 @@ func(support *Support) handleSupportMessage(supportMsg entity.SupportMessage) er
 		if err != nil {
 			return err
 		}
-		return support.transferMessageToUser(topicData.ChatID, supportMsg.Payload)
+		return support.transferMessageToUser(topicData.ChatID, supportMsg.Payload, bot)
 	} else {
-		return fmt.Errorf("couldn't find the topic %d from the support message %s", supportMsg.TopicID, supportMsg.Text)
+		return fmt.Errorf("couldn't find the topic %d from the support message %s", supportMsg.TopicID, supportMsg.Payload)
 	}
 }
 
-func (support *Support) transferMessageToTopic(topicID int, telegramMessage entity.UserMessage) error {
+func (support *Support) transferMessageToTopic(topicID int, telegramMessage entity.UserMessage, bot *bot.Bot, supportChat *telebot.Chat) error {
 	opts := &telebot.SendOptions{
 		ThreadID: topicID,
 	}
 
-	chat, err := support.bot.ChatByID(telegramMessage.ChatID)
+	userChat, err := bot.ChatByID(telegramMessage.ChatID)
 	if err != nil {
 		return err
 	}
 
 	msg := &telebot.Message{
 		ID: int(telegramMessage.MessageID), 
-		Chat: chat}
+		Chat: userChat}
 
-	_, err = support.bot.Forward(
-		support.chat, 
+	_, err = bot.Forward(
+		supportChat, 
 		msg, 
-		opts) 
+		opts)
 	
 	return err
 }
 
-func (support *Support) transferMessageToUser(chatID int64, payload string) error {
-	_, err := support.bot.Send(telebot.ChatID(chatID), payload)
+func (support *Support) transferMessageToUser(chatID int64, payload string, bot *bot.Bot) error {
+	_, err := bot.Send(telebot.ChatID(chatID), payload)
 	return err
 }
 
-func (support *Support) createTopic(telegramMessage entity.UserMessage) error {
-	topic, err := support.bot.CreateTopic(support.chat, generateTopic(telegramMessage.UserName))
+func (support *Support) createTopic(telegramMessage entity.UserMessage, bot *bot.Bot, supportChat *telebot.Chat) error {
+	topic, err := bot.CreateTopic(supportChat, generateTopic(telegramMessage.UserName))
 	if err != nil {
 		return err
 	}
 
 	topicData, err := encoding.ToJSON(entity.NewTopic(
-		telegramMessage.BotToken,
+		[]byte(bot.Token()),
 		telegramMessage.ChatID,
 		telegramMessage.UserID,
 		topic.ThreadID))
-	
+		
+	if err != nil {
+		return err
+	}
+
+	encryptTopicData, err := crypto.EncryptData(topicData)
 	if err != nil {
 		return err
 	}
@@ -172,13 +190,13 @@ func (support *Support) createTopic(telegramMessage entity.UserMessage) error {
 		context.Background(),
 		fmt.Sprintf(topicUserKey, telegramMessage.UserID),
 		fmt.Sprintf(topicSupportKey, topic.ThreadID),
-		topicData,
+		encryptTopicData,
 	)
 
 	if err != nil {
 		return err
 	} else {
-		return support.transferMessageToTopic(topic.ThreadID, telegramMessage)
+		return support.transferMessageToTopic(topic.ThreadID, telegramMessage, bot, supportChat)
 	}
 }
 
@@ -211,22 +229,34 @@ func (support *Support) deleteTopicsInService() {
 			support.log.Error("ExecuteIDInTopicKey", err)
 			continue
 		}
+
 		topicData, err := entity.NewTopicFromJSON([]byte(topic))
 		if err != nil {
 			support.log.Error("ExecuteIDInTopicKey", err)
 			continue
 		}
-		chat, err := support.bot.ChatByID(topicData.ChatID)
+		
+		bot, err := bot.New(support.log, topicData.BotToken, support.timeout)
+
 		if err != nil {
-			support.log.Error("ParseChat", err)
-			continue
+			support.log.Error("InitializeBot", err)
+			return
 		}
+
+		supportChat, err := bot.ChatByID(support.chatID)
+		if err != nil {
+			support.log.Error("InitializeChat", err)
+			return
+		}
+		
 		teleTopic := &telebot.Topic {
 			ThreadID: topicData.TopicID,
 		}
-		err = support.bot.CloseTopic(
-			chat,
+
+		err = bot.CloseTopic(
+			supportChat,
 			teleTopic)
+
 		if err != nil {
 			support.log.Error("CloseTopic", err)
 		}

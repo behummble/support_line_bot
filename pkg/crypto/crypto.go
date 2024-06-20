@@ -11,7 +11,10 @@ import (
 )
 
 func DecryptData(data []byte) (string, error) {
-	key := []byte(os.Getenv("CRYPTO_KEY"))
+	key, err := hex.DecodeString(os.Getenv("CRYPTO_KEY"))
+	if err != nil {
+		return "", err
+	}
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -21,6 +24,7 @@ func DecryptData(data []byte) (string, error) {
 	if len(data) < aes.BlockSize {
 		return "", errors.New("ciphertext too short")
 	}
+
 	iv := data[:aes.BlockSize]
 	data = data[aes.BlockSize:]
 
@@ -35,7 +39,10 @@ func DecryptData(data []byte) (string, error) {
 }
 
 func EncryptData(data []byte) (string, error) {
-	key := []byte(os.Getenv("CRYPTO_KEY"))
+	key, err := hex.DecodeString(os.Getenv("CRYPTO_KEY"))
+	if err != nil {
+		return "", err
+	}
 
 	if len(data) % aes.BlockSize != 0 {
 		data = addPaddingBytes(data)

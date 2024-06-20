@@ -14,6 +14,7 @@ type UserMessage struct {
 }
 
 type SupportMessage struct {
+	BotToken []byte
 	ChatID int64
 	TopicID int
 	Payload string

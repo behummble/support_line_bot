@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 )
 
-func ToJSON(data interface{}) (string, error) {
+func ToJSON(data interface{}) ([]byte, error) {
 	res, err := json.Marshal(data)
-	return string(res), err
+	return res, err
 }
 
 func FromJSON(data []byte, to interface{}) (interface{}, error) {
