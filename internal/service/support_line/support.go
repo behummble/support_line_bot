@@ -172,7 +172,7 @@ func (support *Support) createTopic(telegramMessage entity.UserMessage, bot *bot
 	}
 
 	topicData, err := encoding.ToJSON(entity.NewTopic(
-		[]byte(bot.Token()),
+		bot.Token(),
 		telegramMessage.ChatID,
 		telegramMessage.UserID,
 		topic.ThreadID))

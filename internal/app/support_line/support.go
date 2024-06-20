@@ -34,7 +34,11 @@ func New(log *slog.Logger, support *supp.Support, router Router) (*Support) {
 		supportService: support,
 		router: router,
 	}
-} 
+}
+
+func (support *Support) Register() {
+	support.router.Register()
+}
 
 func (support *Support) ListenMessages(host string, port int) {
 	support.router.Serve(host, port)

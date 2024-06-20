@@ -16,7 +16,7 @@ const (
 type Router struct {
 	supportService *supportline.Support
 	log *slog.Logger
-	router *http.ServeMux
+	mux *http.ServeMux
 }
 
 func New(log *slog.Logger, support *supportline.Support) *Router {
@@ -24,17 +24,17 @@ func New(log *slog.Logger, support *supportline.Support) *Router {
 	return &Router{
 		supportService: support,
 		log: log,
-		router: m,
+		mux: m,
 	}
 }
 
 func (r *Router) Register() {
-	r.router.Handle(userMessages, websocket.Handler(r.userMessage))
-	r.router.Handle(supportMessages, websocket.Handler(r.supportMessage))
+	r.mux.Handle(userMessages, websocket.Handler(r.userMessage))
+	r.mux.Handle(supportMessages, websocket.Handler(r.supportMessage))
 }
 
 func (r *Router) Serve(host string, port int) {
-	err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), r.router)
+	err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), r.mux)
 	if err != nil {
 		panic("ListenAndServe: " + err.Error())
 	}

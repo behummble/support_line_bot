@@ -18,6 +18,7 @@ func main() {
 		config,
 	)
 	go app.Bot.RemoveTopics()
+	app.Bot.Register()
 	app.Bot.ListenMessages(config.Server.Host, config.Server.Port)
 }
 

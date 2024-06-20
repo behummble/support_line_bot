@@ -1,0 +1,7 @@
+include:
+   - ./build/infra/infra.yaml
+services:
+  support_line:
+    build: .
+    ports:
+      - "8080:8080"

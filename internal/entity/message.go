@@ -5,7 +5,7 @@ import (
 )
 
 type UserMessage struct {
-	BotToken []byte
+	BotToken string
 	ChatID int64
 	UserID int64
 	UserName string
@@ -14,13 +14,13 @@ type UserMessage struct {
 }
 
 type SupportMessage struct {
-	BotToken []byte
+	BotToken string
 	ChatID int64
 	TopicID int
 	Payload string
 }
 
-func NewUserMessage(token []byte, chatID, userID, messageID int64, name, payload string) UserMessage {
+func NewUserMessage(token string, chatID, userID, messageID int64, name, payload string) UserMessage {
 	return UserMessage{
 		BotToken: token,
 		ChatID: chatID,

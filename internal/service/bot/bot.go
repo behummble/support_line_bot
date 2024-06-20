@@ -13,8 +13,8 @@ type Bot struct {
 	client *telebot.Bot
 }
 
-func New(log *slog.Logger, encryptedToken []byte, timeout int) (*Bot, error) {
-	token, err := crypto.DecryptData(encryptedToken)
+func New(log *slog.Logger, encryptedToken string, timeout int) (*Bot, error) {
+	token, err := crypto.DecryptData([]byte(encryptedToken))
 	if err != nil {
 		return nil, err
 	}

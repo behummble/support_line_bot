@@ -5,13 +5,13 @@ import (
 )
 
 type TopicData struct {
-	BotToken []byte
+	BotToken string
 	ChatID int64
 	UserID int64
 	TopicID int
 }
 
-func NewTopic(token []byte, chatID, userID int64, topicID int) TopicData {
+func NewTopic(token string, chatID, userID int64, topicID int) TopicData {
 	return TopicData{
 		BotToken: token,
 		ChatID: chatID,
