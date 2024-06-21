@@ -11,6 +11,7 @@ import(
 const (
 	userMessages = "/user/message"
 	supportMessages = "/support/message"
+	ping = "/ping"
 )
 
 type Router struct {
@@ -31,6 +32,11 @@ func New(log *slog.Logger, support *supportline.Support) *Router {
 func (r *Router) Register() {
 	r.mux.Handle(userMessages, websocket.Handler(r.userMessage))
 	r.mux.Handle(supportMessages, websocket.Handler(r.supportMessage))
+	r.mux.Handle(ping, websocket.Handler(
+		func(ws *websocket.Conn) {
+			websocket.Message.Send(ws, "pong")
+		},
+	))
 }
 
 func (r *Router) Serve(host string, port int) {

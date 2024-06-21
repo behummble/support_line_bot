@@ -62,6 +62,7 @@ func(support *Support) ProcessUserMessage(msg []byte) {
 		support.log.Error("InitializeBot", err)
 		return
 	}
+	defer bot.Close()
 
 	supportChat, err := bot.ChatByID(support.chatID)
 	if err != nil {
@@ -87,6 +88,7 @@ func(support *Support) ProcessSupportMessage(msg []byte) {
 		support.log.Error("InitializeBot", err)
 		return
 	}
+	defer bot.Close()
 
 	err = support.handleSupportMessage(supportMsg, bot)
 	if err != nil {
@@ -108,10 +110,16 @@ func(support *Support) handleUserMessage(telegramMessage entity.UserMessage, bot
 	}
 
 	if topic != "" {
-		topicData, err := entity.NewTopicFromJSON([]byte(topic))
+		jsonTopic, err :=  crypto.DecryptData(topic)
 		if err != nil {
 			return err
 		}
+
+		topicData, err := entity.NewTopicFromJSON([]byte(jsonTopic))
+		if err != nil {
+			return err
+		}
+
 		return support.transferMessageToTopic(topicData.TopicID, telegramMessage, bot, supportChat)
 	} else {
 		return support.createTopic(telegramMessage, bot, supportChat)
@@ -128,7 +136,12 @@ func(support *Support) handleSupportMessage(supportMsg entity.SupportMessage, bo
 	}
 
 	if topicInfo != "" {
-		topicData, err := entity.NewTopicFromJSON([]byte(topicInfo))
+		jsonTopic, err :=  crypto.DecryptData(topicInfo)
+		if err != nil {
+			return err
+		}
+
+		topicData, err := entity.NewTopicFromJSON([]byte(jsonTopic))
 		if err != nil {
 			return err
 		}
@@ -161,7 +174,7 @@ func (support *Support) transferMessageToTopic(topicID int, telegramMessage enti
 }
 
 func (support *Support) transferMessageToUser(chatID int64, payload string, bot *bot.Bot) error {
-	_, err := bot.Send(telebot.ChatID(chatID), payload)
+	_, err := bot.Send(telebot.ChatID(chatID), payload, &telebot.SendOptions{})
 	return err
 }
 
@@ -226,11 +239,17 @@ func (support *Support) deleteTopicsInService() {
 			context.Background(),
 	 		key)
 		if err != nil {
-			support.log.Error("ExecuteIDInTopicKey", err)
+			support.log.Error("GetTopicDataFromDB", err)
 			continue
 		}
 
-		topicData, err := entity.NewTopicFromJSON([]byte(topic))
+		jsonTopic, err :=  crypto.DecryptData(topic)
+		if err != nil {
+			support.log.Error("DecryptTopicData", err)
+			continue
+		}
+
+		topicData, err := entity.NewTopicFromJSON([]byte(jsonTopic))
 		if err != nil {
 			support.log.Error("ExecuteIDInTopicKey", err)
 			continue

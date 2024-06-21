@@ -10,12 +10,11 @@ import (
 	"crypto/rand"
 )
 
-func DecryptData(data []byte) (string, error) {
-	//key, err := hex.DecodeString(os.Getenv("CRYPTO_KEY"))
-	//if err != nil {
-	//	return "", err
-	//}
-
+func DecryptData(data string) (string, error) {
+	dataBytes, err := hex.DecodeString(data)
+	if err != nil {
+		return "", err
+	}
 	key := []byte(os.Getenv("CRYPTO_KEY"))
 
 	block, err := aes.NewCipher(key)
@@ -23,28 +22,29 @@ func DecryptData(data []byte) (string, error) {
 		return "", err
 	}
 
-	if len(data) < aes.BlockSize {
+	if len(dataBytes) < aes.BlockSize {
 		return "", errors.New("ciphertext too short")
 	}
 
-	iv := data[:aes.BlockSize]
-	data = data[aes.BlockSize:]
+	iv := dataBytes[:aes.BlockSize]
+	dataBytes = dataBytes[aes.BlockSize:]
 
-	if len(data) % aes.BlockSize != 0 {
+	if len(dataBytes) % aes.BlockSize != 0 {
 		return "", errors.New("ciphertext is not a multiple of the block size")
 	}
 
 	mode := cipher.NewCBCDecrypter(block, iv)
-	mode.CryptBlocks(data, data)
+	mode.CryptBlocks(dataBytes, dataBytes)
 
-	return string(data), nil
+	dataBytes, err = removePaddingBytes(dataBytes)
+	if err != nil {
+		return "", err
+	}
+	
+	return string(dataBytes), nil
 }
 
 func EncryptData(data []byte) (string, error) {
-	//key, err := hex.DecodeString(os.Getenv("CRYPTO_KEY"))
-	//if err != nil {
-	//	return "", err
-	//}
 	key := []byte(os.Getenv("CRYPTO_KEY"))
 
 	if len(data) % aes.BlockSize != 0 {
@@ -65,15 +65,21 @@ func EncryptData(data []byte) (string, error) {
 	mode := cipher.NewCBCEncrypter(block, iv)
 	mode.CryptBlocks(ciphertext[aes.BlockSize:], data)
 
-	//return string(data), nil
 	return hex.EncodeToString(ciphertext), nil
 }
 
 func addPaddingBytes(data []byte) []byte {
-    num := aes.BlockSize - len(data) % aes.BlockSize
-    for i := 0; i < num; i++ {
-        data = append(data, 0)
-    }
+	l := 16 - len(data) % 16
+	padding := make([]byte, l)
+	padding[l-1] = byte(l)
+	return append(data, padding...)
+}
 
-    return data
+func removePaddingBytes(data []byte) ([]byte, error) {
+	l := int(data[len(data)-1])
+	if l > 16 {
+		return nil, errors.New("Padding incorrect")
+	}
+
+	return data[:len(data)-l], nil
 }

@@ -14,7 +14,7 @@ type Bot struct {
 }
 
 func New(log *slog.Logger, encryptedToken string, timeout int) (*Bot, error) {
-	token, err := crypto.DecryptData([]byte(encryptedToken))
+	token, err := crypto.DecryptData(encryptedToken)
 	if err != nil {
 		return nil, err
 	}
@@ -49,11 +49,11 @@ func (bot *Bot) ChatByID(chatID int64) (*telebot.Chat, error) {
 	return bot.client.ChatByID(chatID)
 }
 
-func (bot *Bot) Forward(to telebot.Recipient, msg telebot.Editable, opts ...interface{}) (*telebot.Message, error) {
+func (bot *Bot) Forward(to telebot.Recipient, msg telebot.Editable, opts *telebot.SendOptions) (*telebot.Message, error) {
 	return bot.client.Forward(to, msg, opts)
 }
 
-func (bot *Bot) Send(to telebot.Recipient, what interface{}, opts ...interface{}) (*telebot.Message, error) {
+func (bot *Bot) Send(to telebot.Recipient, what string, opts *telebot.SendOptions) (*telebot.Message, error) {
 	return bot.client.Send(to, what, opts)
 }
 
@@ -63,4 +63,8 @@ func (bot *Bot) CreateTopic(chat *telebot.Chat, topic *telebot.Topic) (*telebot.
 
 func (bot *Bot) CloseTopic(chat *telebot.Chat, topic *telebot.Topic) error {
 	return bot.client.CloseTopic(chat, topic)
+}
+
+func (bot *Bot) Close() {
+	bot.client.Close()
 }
