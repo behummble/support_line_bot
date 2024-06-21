@@ -11,10 +11,12 @@ import (
 )
 
 func DecryptData(data []byte) (string, error) {
-	key, err := hex.DecodeString(os.Getenv("CRYPTO_KEY"))
-	if err != nil {
-		return "", err
-	}
+	//key, err := hex.DecodeString(os.Getenv("CRYPTO_KEY"))
+	//if err != nil {
+	//	return "", err
+	//}
+
+	key := []byte(os.Getenv("CRYPTO_KEY"))
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -39,10 +41,11 @@ func DecryptData(data []byte) (string, error) {
 }
 
 func EncryptData(data []byte) (string, error) {
-	key, err := hex.DecodeString(os.Getenv("CRYPTO_KEY"))
-	if err != nil {
-		return "", err
-	}
+	//key, err := hex.DecodeString(os.Getenv("CRYPTO_KEY"))
+	//if err != nil {
+	//	return "", err
+	//}
+	key := []byte(os.Getenv("CRYPTO_KEY"))
 
 	if len(data) % aes.BlockSize != 0 {
 		data = addPaddingBytes(data)
@@ -62,7 +65,8 @@ func EncryptData(data []byte) (string, error) {
 	mode := cipher.NewCBCEncrypter(block, iv)
 	mode.CryptBlocks(ciphertext[aes.BlockSize:], data)
 
-	return string(data), nil
+	//return string(data), nil
+	return hex.EncodeToString(ciphertext), nil
 }
 
 func addPaddingBytes(data []byte) []byte {
