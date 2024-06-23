@@ -1,7 +1,6 @@
 package entity
 
 import (
-	//"github.com/behummble/support_line_bot/pkg/encoding"
 	"encoding/json"
 )
 
@@ -34,12 +33,11 @@ func NewUserMessage(token string, chatID, userID, messageID int64, name, payload
 
 func NewUserMessageFromJSON(data []byte) (UserMessage, error) {
 	var msg UserMessage
-	//res, err := encoding.FromJSON(data, msg)
 	err := json.Unmarshal(data, &msg)
 	if err != nil {
 		return UserMessage{}, err
 	}
-	//return res.(UserMessage), err
+
 	return msg, err
 }
 
@@ -52,12 +50,11 @@ func NewSupportMessage(chatID int64, topicID int, Payload string) SupportMessage
 }
 
 func NewSupportMessageFromJSON(data []byte) (SupportMessage, error) {
-	//res, err := encoding.FromJSON(data, SupportMessage{})
 	var msg SupportMessage
 	err := json.Unmarshal(data, &msg)
 	if err != nil {
 		return SupportMessage{}, err
 	}
-	//return res.(SupportMessage), err
+
 	return msg, err
 }

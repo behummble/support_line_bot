@@ -31,7 +31,7 @@ func initLog() *slog.Logger {
 }
 
 func setEnv() {
-	err := godotenv.Load("../../.env")
+	err := godotenv.Load("app.env")
 	if err != nil {
 		panic(err)
 	}

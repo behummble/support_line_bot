@@ -7,20 +7,10 @@ import (
 	
 )
 
-const (
-	userMessages = "/user/message"
-	supportMessages = "/support/message"
-)
-
 type Router interface {
 	Serve(host string, port int)
 	Register()
 }
-
-/*type SupportService interface {
-	ProcessUserMessage(message []byte)
-	ProcessSupportMessage(message []byte)
-} */
 
 type Support struct {
 	log *slog.Logger

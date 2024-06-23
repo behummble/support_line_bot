@@ -2,6 +2,12 @@ include:
    - ./build/infra/infra.yaml
 services:
   support_line:
-    build: .
+    build:
+      context: .
+      dockerfile: ./build/app/Dockerfile
     ports:
       - "8080:8080"
+    develop:
+      watch: 
+        - path: ./
+          action: rebuild

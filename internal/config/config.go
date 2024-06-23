@@ -3,7 +3,6 @@ package config
 import (
 	"flag"
 	"os"
-	"runtime"
 
 	"github.com/ilyakaznacheev/cleanenv"
 )
@@ -18,20 +17,17 @@ type RedisConfig struct {
 	Host string `yaml:"host" env:"DB_HOST" env-default:"127.0.0.1"`
 	Port string `yaml:"port" env:"DB_PORT" env-default:"5432"`
 	Password string `yaml:"password" env:"REDIS_PASSWORD"`
-	TopicsList string `yaml:"topic_list"`
 }
 
 type BotConfig struct {
 	Token string `yaml:"token" env:"BOT_TOKEN"`
 	UpdateTimeout int `yaml:"timeout" env-default:"10"`
-	Name string `yaml:"name"`
 	ChatID int64 `yaml:"chatID" env:"CHAT_ID"`
 }
 
 type ServerConfig struct {
 	Host string `yaml:"host"`
 	Port int `yaml:"port"`
-	Path string `yaml:"path"`
 }
 
 func MustLoad() *Config {
@@ -48,19 +44,13 @@ func loadPath() string {
 	flag.StringVar(&path, "config", "", "path to config file")
 	flag.Parse()
 	if path == "" {	
-		if runtime.GOOS == "windows" {
-			path = "..\\..\\config\\config.yaml"
-	
-		} else {
-			path = "../../config/config.yaml"
-		}
+		path = "./config/config.yaml"
 	}
 
 	return path
 }
 
 func loadConfig(path string) *Config {
-
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		panic("config file does not exist: " + path)
 	}
