@@ -36,10 +36,7 @@ func DecryptData(data string) (string, error) {
 	mode := cipher.NewCBCDecrypter(block, iv)
 	mode.CryptBlocks(dataBytes, dataBytes)
 
-	dataBytes, err = removePaddingBytes(dataBytes)
-	if err != nil {
-		return "", err
-	}
+	dataBytes = removePaddingBytes(dataBytes)
 	
 	return string(dataBytes), nil
 }
@@ -75,11 +72,11 @@ func addPaddingBytes(data []byte) []byte {
 	return append(data, padding...)
 }
 
-func removePaddingBytes(data []byte) ([]byte, error) {
+func removePaddingBytes(data []byte) []byte {
 	l := int(data[len(data)-1])
 	if l > 16 {
-		return nil, errors.New("Padding incorrect")
+		return data
 	}
 
-	return data[:len(data)-l], nil
+	return data[:len(data)-l]
 }
