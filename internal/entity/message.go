@@ -41,8 +41,9 @@ func NewUserMessageFromJSON(data []byte) (UserMessage, error) {
 	return msg, err
 }
 
-func NewSupportMessage(chatID int64, topicID int, Payload string) SupportMessage {
+func NewSupportMessage(token string, chatID int64, topicID int, Payload string) SupportMessage {
 	return SupportMessage{
+		BotToken: token,
 		ChatID: chatID,
 		TopicID: topicID,
 		Payload: Payload,
