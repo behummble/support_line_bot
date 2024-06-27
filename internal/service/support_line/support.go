@@ -255,30 +255,31 @@ func (support *Support) deleteTopicsInService() {
 			continue
 		}
 		
-		bot, err := bot.New(support.log, topicData.BotToken, support.timeout)
+		bot, err := bot.NewWithoutDecryption(support.log, topicData.BotToken, support.timeout)
 
 		if err != nil {
 			support.log.Error("InitializeBot", err)
-			return
+			continue
 		}
 
 		supportChat, err := bot.ChatByID(support.chatID)
 		if err != nil {
 			support.log.Error("InitializeChat", err)
-			return
+			continue
 		}
 		
 		teleTopic := &telebot.Topic {
 			ThreadID: topicData.TopicID,
 		}
 
-		err = bot.CloseTopic(
+		err = bot.DeleteTopic(
 			supportChat,
 			teleTopic)
 
 		if err != nil {
-			support.log.Error("CloseTopic", err)
+			support.log.Error("DeleteTopic", err)
 		}
+		bot.Close()
 	}
 }
 

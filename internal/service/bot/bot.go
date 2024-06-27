@@ -31,14 +31,17 @@ func New(log *slog.Logger, encryptedToken string, timeout int) (*Bot, error) {
 	}, nil
 }
 
-func newBotClient(token string, timeout int) (*telebot.Bot, error) {
-	bot, err := telebot.NewBot(
-		telebot.Settings{
-			Token: token,
-			Poller: &telebot.LongPoller{Timeout: time.Second * time.Duration(timeout)},
-		},
-	)
-	return bot, err
+func NewWithoutDecryption(log *slog.Logger, token string, timeout int) (*Bot, error) {
+	client, err := newBotClient(token, timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Bot{
+		log: log,
+		token: token,
+		client: client,
+	}, nil
 }
 
 func (bot *Bot) Token() string {
@@ -65,6 +68,20 @@ func (bot *Bot) CloseTopic(chat *telebot.Chat, topic *telebot.Topic) error {
 	return bot.client.CloseTopic(chat, topic)
 }
 
+func (bot *Bot) DeleteTopic(chat *telebot.Chat, topic *telebot.Topic) error {
+	return bot.client.DeleteTopic(chat, topic)
+}
+
 func (bot *Bot) Close() {
 	bot.client.Close()
+}
+
+func newBotClient(token string, timeout int) (*telebot.Bot, error) {
+	bot, err := telebot.NewBot(
+		telebot.Settings{
+			Token: token,
+			Poller: &telebot.LongPoller{Timeout: time.Second * time.Duration(timeout)},
+		},
+	)
+	return bot, err
 }
