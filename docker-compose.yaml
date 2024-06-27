@@ -2,6 +2,7 @@ include:
    - ./build/infra/infra.yaml
 services:
   support_line:
+    container_name: support_line
     build:
       context: .
       dockerfile: ./build/app/Dockerfile
