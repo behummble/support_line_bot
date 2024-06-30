@@ -228,12 +228,16 @@ func (support *Support) clearTopicsFunc() func() {
 }
 
 func (support *Support) deleteTopicsInService() {
+	support.log.Info("Start delete topics")
+
 	keys, err := support.db.AllTopics(context.Background())
 	if err != nil {
 		support.log.Error("GetAllTopics", err)
 		return
 	}
-	
+
+	support.log.Info(fmt.Sprintf("The number of topics to delete: %d", len(keys)/2))
+
 	for _, key := range keys {
 		topic, err := support.db.Topic(
 			context.Background(),
@@ -281,6 +285,8 @@ func (support *Support) deleteTopicsInService() {
 		}
 		bot.Close()
 	}
+	
+	support.log.Info("Finished delete topics")
 }
 
 func (sbot *Support) deleteTopicsInDB() {

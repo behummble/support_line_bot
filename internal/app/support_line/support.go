@@ -31,6 +31,7 @@ func (support *Support) Register() {
 }
 
 func (support *Support) ListenMessages(host string, port int) {
+	support.log.Info("Start listening messages")
 	support.router.Serve(host, port)
 }
 
