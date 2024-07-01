@@ -5,5 +5,7 @@ services:
       - 6379:6379
     container_name: redis
     volumes:
-     - ./redis-data:/var/lib/redis
-     - ./redis.conf:/usr/local/etc/redis/redis.conf
+      - ./redis-data:/var/lib/redis
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    env_file:
+      - db.env
