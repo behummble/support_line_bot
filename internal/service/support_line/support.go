@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	topicUserKey = "topic:user:{%d}"
-	topicSupportKey = "topic:{%d}"
+	topicUserKey = "chatid{%d}:topic:user:{%d}"
+	topicSupportKey = "chatid{%d}:topic:{%d}"
 )
 
 type DB interface {
@@ -52,47 +52,47 @@ func New(log *slog.Logger, db DB, chatID int64, timeout int) *Support {
 func(support *Support) ProcessUserMessage(msg []byte) {
 	telegramMessage, err := entity.NewUserMessageFromJSON(msg)
 	if err != nil {
-		support.log.Error("ParseUserMessage", err)
+		support.log.Error("Can`t parse user message", "Error", err)
 		return
 	}
 
 	bot, err := bot.New(support.log, telegramMessage.BotToken, support.timeout)
 
 	if err != nil {
-		support.log.Error("InitializeBot", err)
+		support.log.Error("Can`t initialize bot while process user message", "Error", err)
 		return
 	}
 	defer bot.Close()
 
-	supportChat, err := bot.ChatByID(support.chatID)
+	supportChat, err := bot.ChatByID(telegramMessage.GroupChatID)
 	if err != nil {
-		support.log.Error("InitializeChat", err)
+		support.log.Error("Can`t initialize chat while process user message", "Error", err)
 		return
 	}
 
 	err = support.handleUserMessage(telegramMessage, bot, supportChat)
 	if err != nil {
-		support.log.Error("HandleMessage", err)
+		support.log.Error("Handle user message", "Error", err)
 	}
 }
 
 func(support *Support) ProcessSupportMessage(msg []byte) {
 	supportMsg, err := entity.NewSupportMessageFromJSON(msg)
 	if err != nil {
-		support.log.Error("ParseSupportMessage", err)
+		support.log.Error("Can`t parse support message", "Error", err)
 		return 
 	}
 
 	bot, err := bot.New(support.log, supportMsg.BotToken, support.timeout)
 	if err != nil {
-		support.log.Error("InitializeBot", err)
+		support.log.Error("Can`t initialize bot while process user message", "Error", err)
 		return
 	}
 	defer bot.Close()
 
 	err = support.handleSupportMessage(supportMsg, bot)
 	if err != nil {
-		support.log.Error("HandleMessage", err)
+		support.log.Error("Handle support message", "Error", err)
 	}
 }
 
@@ -104,7 +104,7 @@ func(support *Support) RemoveTopics() {
 func(support *Support) handleUserMessage(telegramMessage entity.UserMessage, bot *bot.Bot, supportChat *telebot.Chat) error {
 	topic, err := support.db.Topic(
 		context.Background(), 
-		fmt.Sprintf(topicUserKey, telegramMessage.UserID))
+		fmt.Sprintf(topicUserKey, telegramMessage.GroupChatID, telegramMessage.UserID))
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func(support *Support) handleUserMessage(telegramMessage entity.UserMessage, bot
 func(support *Support) handleSupportMessage(supportMsg entity.SupportMessage, bot *bot.Bot) error {
 	topicInfo, err := support.db.Topic(
 		context.Background(), 
-		fmt.Sprintf(topicSupportKey, supportMsg.TopicID))
+		fmt.Sprintf(topicSupportKey, supportMsg.ChatID, supportMsg.TopicID))
 
 	if err != nil {
 		return err
@@ -188,7 +188,8 @@ func (support *Support) createTopic(telegramMessage entity.UserMessage, bot *bot
 		bot.Token(),
 		telegramMessage.ChatID,
 		telegramMessage.UserID,
-		topic.ThreadID))
+		telegramMessage.GroupChatID,
+		topic.ThreadID,))
 		
 	if err != nil {
 		return err
@@ -201,8 +202,8 @@ func (support *Support) createTopic(telegramMessage entity.UserMessage, bot *bot
 
 	err = support.db.NewTopic(
 		context.Background(),
-		fmt.Sprintf(topicUserKey, telegramMessage.UserID),
-		fmt.Sprintf(topicSupportKey, topic.ThreadID),
+		fmt.Sprintf(topicUserKey, telegramMessage.GroupChatID, telegramMessage.UserID),
+		fmt.Sprintf(topicSupportKey, telegramMessage.GroupChatID, topic.ThreadID),
 		encryptTopicData,
 	)
 
@@ -232,7 +233,7 @@ func (support *Support) deleteTopicsInService() {
 
 	keys, err := support.db.AllTopics(context.Background())
 	if err != nil {
-		support.log.Error("GetAllTopics", err)
+		support.log.Error("Failed to get all topics", "Error", err)
 		return
 	}
 
@@ -243,32 +244,32 @@ func (support *Support) deleteTopicsInService() {
 			context.Background(),
 	 		key)
 		if err != nil {
-			support.log.Error("GetTopicDataFromDB", err)
+			support.log.Error("Failed to execute topic data from DB", "Error", err)
 			continue
 		}
 
 		jsonTopic, err :=  crypto.DecryptData(topic)
 		if err != nil {
-			support.log.Error("DecryptTopicData", err)
+			support.log.Error("Can`t decrypt topic data", "Error", err)
 			continue
 		}
 
 		topicData, err := entity.NewTopicFromJSON([]byte(jsonTopic))
 		if err != nil {
-			support.log.Error("ExecuteIDInTopicKey", err)
+			support.log.Error("Can`t execute ID in topic key", "Error", err)
 			continue
 		}
 		
 		bot, err := bot.NewWithoutDecryption(support.log, topicData.BotToken, support.timeout)
 
 		if err != nil {
-			support.log.Error("InitializeBot", err)
+			support.log.Error("Can`t initialize bot in sheduling delete topics", "Error", err)
 			continue
 		}
 
-		supportChat, err := bot.ChatByID(support.chatID)
+		supportChat, err := bot.ChatByID(topicData.GroupChatID)
 		if err != nil {
-			support.log.Error("InitializeChat", err)
+			support.log.Error("Can`t initialize chat in sheduling delete topics", "Error", err)
 			continue
 		}
 		
@@ -281,7 +282,7 @@ func (support *Support) deleteTopicsInService() {
 			teleTopic)
 
 		if err != nil {
-			support.log.Error("DeleteTopic", err)
+			support.log.Error("Failed to delete topic", "Error", err)
 		}
 		bot.Close()
 	}
@@ -292,6 +293,6 @@ func (support *Support) deleteTopicsInService() {
 func (sbot *Support) deleteTopicsInDB() {
 	err := sbot.db.ClearTopics(context.Background())
 	if err != nil {
-		sbot.log.Error("SheduledFlushTopics", err)
+		sbot.log.Error("Sheduled flush topics in DB failed", "Error", err)
 	}
 }

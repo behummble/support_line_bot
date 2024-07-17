@@ -9,14 +9,16 @@ type TopicData struct {
 	ChatID int64
 	UserID int64
 	TopicID int
+	GroupChatID int64
 }
 
-func NewTopic(token string, chatID, userID int64, topicID int) TopicData {
+func NewTopic(token string, chatID, userID, groupChatID int64, topicID int) TopicData {
 	return TopicData{
 		BotToken: token,
 		ChatID: chatID,
 		UserID: userID,
 		TopicID: topicID,
+		GroupChatID: groupChatID,
 	}
 }
 

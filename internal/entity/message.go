@@ -11,6 +11,7 @@ type UserMessage struct {
 	UserName string
 	Payload string
 	MessageID int64
+	GroupChatID int64
 }
 
 type SupportMessage struct {
@@ -20,7 +21,7 @@ type SupportMessage struct {
 	Payload string
 }
 
-func NewUserMessage(token string, chatID, userID, messageID int64, name, payload string) UserMessage {
+func NewUserMessage(token string, chatID, userID, messageID, groupChatID int64, name, payload string) UserMessage {
 	return UserMessage{
 		BotToken: token,
 		ChatID: chatID,
