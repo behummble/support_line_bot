@@ -17,12 +17,13 @@ import (
 const (
 	topicUserKey = "chatid{%d}:topic:user:{%d}"
 	topicSupportKey = "chatid{%d}:topic:{%d}"
+	maskForAllTopics = "chat*"
 )
 
 type DB interface {
 	NewTopic(ctx context.Context, topicUserKey, topicSupportKey string, topicData string) error
 	Topic(ctx context.Context, topic string) (string, error)
-	AllTopics(ctx context.Context) ([]string, error)
+	AllTopics(ctx context.Context, keys string) ([]string, error)
 	ClearTopics(ctx context.Context) error
 }
 
@@ -231,7 +232,7 @@ func (support *Support) clearTopicsFunc() func() {
 func (support *Support) deleteTopicsInService() {
 	support.log.Info("Start delete topics")
 
-	keys, err := support.db.AllTopics(context.Background())
+	keys, err := support.db.AllTopics(context.Background(), maskForAllTopics)
 	if err != nil {
 		support.log.Error("Failed to get all topics", "Error", err)
 		return

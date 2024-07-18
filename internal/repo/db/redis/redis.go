@@ -57,8 +57,8 @@ func (client Client) ClearTopics(ctx context.Context) error {
 	_, err := client.conn.FlushAll(ctx).Result()
 	return err
 }
-func (client Client) AllTopics(ctx context.Context) ([]string, error) {
-	return client.conn.Keys(ctx, "topic:*").Result()
+func (client Client) AllTopics(ctx context.Context, key string) ([]string, error) {
+	return client.conn.Keys(ctx, key).Result()
 }
 
 func connect(host, port, password string) (*redis.Client, error) {
