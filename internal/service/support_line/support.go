@@ -238,6 +238,9 @@ func (support *Support) deleteTopicsInService() {
 		return
 	}
 
+	bots := make(map[string]*bot.Bot)
+	groupChats := make(map[int64]*telebot.Chat)
+
 	support.log.Info(fmt.Sprintf("The number of topics to delete: %d", len(keys)/2))
 
 	for _, key := range keys {
@@ -257,22 +260,29 @@ func (support *Support) deleteTopicsInService() {
 
 		topicData, err := entity.NewTopicFromJSON([]byte(jsonTopic))
 		if err != nil {
-			support.log.Error("Can`t execute ID in topic key", "Error", err)
+			support.log.Error("Can`t parse topic data from json", "Error", err)
 			continue
 		}
 		
-		bot, err := bot.NewWithoutDecryption(support.log, topicData.BotToken, support.timeout)
-
-		if err != nil {
-			support.log.Error("Can`t initialize bot in sheduling delete topics", "Error", err)
-			continue
+		if _, ok := bots[topicData.BotToken]; !ok {
+			bot, err := bot.NewWithoutDecryption(support.log, topicData.BotToken, support.timeout)
+			if err != nil {
+				support.log.Error("Can`t initialize bot in sheduling delete topics", "Error", err)
+				continue
+			}
+			bots[topicData.BotToken] = bot
 		}
+		bot := bots[topicData.BotToken]
 
-		supportChat, err := bot.ChatByID(topicData.GroupChatID)
-		if err != nil {
-			support.log.Error("Can`t initialize chat in sheduling delete topics", "Error", err)
-			continue
+		if _, ok := groupChats[topicData.GroupChatID]; !ok {
+			supportChat, err := bot.ChatByID(topicData.GroupChatID)
+			if err != nil {
+				support.log.Error("Can`t initialize chat in sheduling delete topics", "Error", err)
+				continue
+			}
+			groupChats[topicData.GroupChatID] = supportChat
 		}
+		supportChat := groupChats[topicData.GroupChatID]
 		
 		teleTopic := &telebot.Topic {
 			ThreadID: topicData.TopicID,
@@ -285,9 +295,12 @@ func (support *Support) deleteTopicsInService() {
 		if err != nil {
 			support.log.Error("Failed to delete topic", "Error", err)
 		}
+	}
+
+	for _, bot := range bots {
 		bot.Close()
 	}
-	
+
 	support.log.Info("Finished delete topics")
 }
 
