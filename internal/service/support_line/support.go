@@ -257,7 +257,7 @@ func (support *Support) deleteTopicsInService() {
 	groupChats := make(map[int64]*telebot.Chat)
 	var waitGroup sync.WaitGroup
 
-	support.log.Info(fmt.Sprintf("The number of topics to delete: %d", len(keys)/2))
+	support.log.Info(fmt.Sprintf("The number of topics to delete: %d", len(keys)))
 
 	for _, key := range keys {
 		waitGroup.Add(1)
