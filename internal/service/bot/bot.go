@@ -76,6 +76,10 @@ func (bot *Bot) Close() {
 	bot.client.Close()
 }
 
+func (bot *Bot) EditMessage(msg *telebot.Message, what string) (*telebot.Message, error) {
+	return bot.client.Edit(msg, what)
+}
+
 func newBotClient(token string, timeout int) (*telebot.Bot, error) {
 	bot, err := telebot.NewBot(
 		telebot.Settings{

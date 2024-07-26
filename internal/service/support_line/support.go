@@ -4,24 +4,26 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
-	"gopkg.in/telebot.v3"
-	"github.com/robfig/cron"
 
-	"github.com/behummble/support_line_bot/internal/service/bot"
+	"github.com/robfig/cron"
+	"gopkg.in/telebot.v3"
+
 	"github.com/behummble/support_line_bot/internal/entity"
-	"github.com/behummble/support_line_bot/pkg/encoding"
+	"github.com/behummble/support_line_bot/internal/service/bot"
 	"github.com/behummble/support_line_bot/pkg/crypto"
+	"github.com/behummble/support_line_bot/pkg/encoding"
 )
 
 const (
 	topicUserKey = "chatid{%d}:topic:user:{%d}"
 	topicSupportKey = "chatid{%d}:topic:{%d}"
-	maskForAllTopics = "chat*"
+	allTopics = "topic:list"
 )
 
 type DB interface {
-	NewTopic(ctx context.Context, topicUserKey, topicSupportKey string, topicData string) error
+	NewTopic(ctx context.Context, topicUserKey, topicSupportKey, topicListKey, topicData string) error
 	Topic(ctx context.Context, topic string) (string, error)
 	AllTopics(ctx context.Context, keys string) ([]string, error)
 	ClearTopics(ctx context.Context) error
@@ -146,7 +148,12 @@ func(support *Support) handleSupportMessage(supportMsg entity.SupportMessage, bo
 		if err != nil {
 			return err
 		}
-		return support.transferMessageToUser(topicData.ChatID, supportMsg.Payload, bot)
+		supportChat, err := bot.ChatByID(supportMsg.ChatID)
+		if err != nil {
+			support.log.Error("Can`t initialize chat while process user message", "Error", err)
+			return err
+		}
+		return support.transferMessageToUser(topicData.ChatID, supportMsg.Payload, bot, supportMsg.MessageID, supportChat)
 	} else {
 		return fmt.Errorf("couldn't find the topic %d from the support message %s", supportMsg.TopicID, supportMsg.Payload)
 	}
@@ -174,9 +181,16 @@ func (support *Support) transferMessageToTopic(topicID int, telegramMessage enti
 	return err
 }
 
-func (support *Support) transferMessageToUser(chatID int64, payload string, bot *bot.Bot) error {
+func (support *Support) transferMessageToUser(chatID int64, payload string, bot *bot.Bot, messageID int, schat *telebot.Chat) error {
+	msg := &telebot.Message{
+		ID: messageID, 
+		Chat: schat}
+	edMessage, _ := bot.EditMessage(msg, "")
+	if edMessage != nil {
 	_, err := bot.Send(telebot.ChatID(chatID), payload, &telebot.SendOptions{})
 	return err
+	}
+	return nil
 }
 
 func (support *Support) createTopic(telegramMessage entity.UserMessage, bot *bot.Bot, supportChat *telebot.Chat) error {
@@ -205,6 +219,7 @@ func (support *Support) createTopic(telegramMessage entity.UserMessage, bot *bot
 		context.Background(),
 		fmt.Sprintf(topicUserKey, telegramMessage.GroupChatID, telegramMessage.UserID),
 		fmt.Sprintf(topicSupportKey, telegramMessage.GroupChatID, topic.ThreadID),
+		allTopics,
 		encryptTopicData,
 	)
 
@@ -232,7 +247,7 @@ func (support *Support) clearTopicsFunc() func() {
 func (support *Support) deleteTopicsInService() {
 	support.log.Info("Start delete topics")
 
-	keys, err := support.db.AllTopics(context.Background(), maskForAllTopics)
+	keys, err := support.db.AllTopics(context.Background(), allTopics)
 	if err != nil {
 		support.log.Error("Failed to get all topics", "Error", err)
 		return
@@ -240,63 +255,69 @@ func (support *Support) deleteTopicsInService() {
 
 	bots := make(map[string]*bot.Bot)
 	groupChats := make(map[int64]*telebot.Chat)
+	var waitGroup sync.WaitGroup
 
 	support.log.Info(fmt.Sprintf("The number of topics to delete: %d", len(keys)/2))
 
 	for _, key := range keys {
-		topic, err := support.db.Topic(
-			context.Background(),
-	 		key)
-		if err != nil {
-			support.log.Error("Failed to execute topic data from DB", "Error", err)
-			continue
-		}
-
-		jsonTopic, err :=  crypto.DecryptData(topic)
-		if err != nil {
-			support.log.Error("Can`t decrypt topic data", "Error", err)
-			continue
-		}
-
-		topicData, err := entity.NewTopicFromJSON([]byte(jsonTopic))
-		if err != nil {
-			support.log.Error("Can`t parse topic data from json", "Error", err)
-			continue
-		}
-		
-		if _, ok := bots[topicData.BotToken]; !ok {
-			bot, err := bot.NewWithoutDecryption(support.log, topicData.BotToken, support.timeout)
+		waitGroup.Add(1)
+		go func(key string) {
+			defer waitGroup.Done()
+			topic, err := support.db.Topic(
+				context.Background(),
+				key)
 			if err != nil {
-				support.log.Error("Can`t initialize bot in sheduling delete topics", "Error", err)
-				continue
+				support.log.Error("Failed to execute topic data from DB", "Error", err)
+				return
 			}
-			bots[topicData.BotToken] = bot
-		}
-		bot := bots[topicData.BotToken]
 
-		if _, ok := groupChats[topicData.GroupChatID]; !ok {
-			supportChat, err := bot.ChatByID(topicData.GroupChatID)
+			jsonTopic, err :=  crypto.DecryptData(topic)
 			if err != nil {
-				support.log.Error("Can`t initialize chat in sheduling delete topics", "Error", err)
-				continue
+				support.log.Error("Can`t decrypt topic data", "Error", err)
+				return
 			}
-			groupChats[topicData.GroupChatID] = supportChat
-		}
-		supportChat := groupChats[topicData.GroupChatID]
-		
-		teleTopic := &telebot.Topic {
-			ThreadID: topicData.TopicID,
-		}
 
-		err = bot.DeleteTopic(
-			supportChat,
-			teleTopic)
+			topicData, err := entity.NewTopicFromJSON([]byte(jsonTopic))
+			if err != nil {
+				support.log.Error("Can`t parse topic data from json", "Error", err)
+				return
+			}
+			
+			if _, ok := bots[topicData.BotToken]; !ok {
+				bot, err := bot.NewWithoutDecryption(support.log, topicData.BotToken, support.timeout)
+				if err != nil {
+					support.log.Error("Can`t initialize bot in sheduling delete topics", "Error", err)
+					return
+				}
+				bots[topicData.BotToken] = bot
+			}
+			bot := bots[topicData.BotToken]
 
-		if err != nil {
-			support.log.Error("Failed to delete topic", "Error", err)
-		}
+			if _, ok := groupChats[topicData.GroupChatID]; !ok {
+				supportChat, err := bot.ChatByID(topicData.GroupChatID)
+				if err != nil {
+					support.log.Error("Can`t initialize chat in sheduling delete topics", "Error", err)
+					return
+				}
+				groupChats[topicData.GroupChatID] = supportChat
+			}
+			supportChat := groupChats[topicData.GroupChatID]
+			
+			teleTopic := &telebot.Topic {
+				ThreadID: topicData.TopicID,
+			}
+
+			err = bot.DeleteTopic(
+				supportChat,
+				teleTopic)
+
+			if err != nil {
+				support.log.Error("Failed to delete topic", "Error", err)
+			}
+		} (key)	
 	}
 
+	waitGroup.Wait()
 	for _, bot := range bots {
 		bot.Close()
 	}

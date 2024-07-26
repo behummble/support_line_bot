@@ -19,6 +19,7 @@ type SupportMessage struct {
 	ChatID int64
 	TopicID int
 	Payload string
+	MessageID int
 }
 
 func NewUserMessage(token string, chatID, userID, messageID, groupChatID int64, name, payload string) UserMessage {

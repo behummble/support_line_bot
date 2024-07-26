@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -32,24 +31,18 @@ func (client Client) Topic(ctx context.Context, topic string) (string, error) {
 	return res, err
 }
 
-func (client Client) Receive(ctx context.Context, botName string, msgs chan<- string) {
-	for {
-		messages, err := client.conn.BLPop(context.Background(), time.Second * 3, botName).Result()
-		if err != nil {
-			client.log.Error("PopMessage", err)
-		}
-		for _, msg := range messages {
-			msgs<- msg
-		}
-	}
-}
-
-func (client Client) NewTopic(ctx context.Context, topicUserKey, topicSupportKey string, topicData string) error {
+func (client Client) NewTopic(ctx context.Context, topicUserKey, topicSupportKey, topicListKey, topicData string) error {
 	err := client.set(ctx, topicUserKey, topicData)
 	if err != nil {
-		client.log.Error("CreateTopicUser", err)
+		client.log.Error("Add topic user in DB", "Error", err)
 	}
+
 	err = client.set(ctx, topicSupportKey, topicData)
+	if err != nil {
+		client.log.Error("Add topic support in DB", "Error",err)
+	}
+
+	err = client.push(ctx, topicListKey, topicSupportKey)
 	return err
 }
 
@@ -58,7 +51,7 @@ func (client Client) ClearTopics(ctx context.Context) error {
 	return err
 }
 func (client Client) AllTopics(ctx context.Context, key string) ([]string, error) {
-	return client.conn.Keys(ctx, key).Result()
+	return client.conn.LRange(ctx, key, 0, -1).Result()
 }
 
 func connect(host, port, password string) (*redis.Client, error) {
@@ -80,5 +73,10 @@ func connect(host, port, password string) (*redis.Client, error) {
 
 func (client Client) set(ctx context.Context, key string, value interface{}) error {
 	_, err := client.conn.Set(ctx, key, value, 0).Result()
+	return err
+}
+
+func (client Client) push(ctx context.Context, key string, value interface{}) error {
+	_, err := client.conn.LPush(ctx, key, value).Result()
 	return err
 }
