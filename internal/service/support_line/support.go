@@ -148,12 +148,7 @@ func(support *Support) handleSupportMessage(supportMsg entity.SupportMessage, bo
 		if err != nil {
 			return err
 		}
-		supportChat, err := bot.ChatByID(supportMsg.ChatID)
-		if err != nil {
-			support.log.Error("Can`t initialize chat while process user message", "Error", err)
-			return err
-		}
-		return support.transferMessageToUser(topicData.ChatID, supportMsg.Payload, bot, supportMsg.MessageID, supportChat)
+		return support.transferMessageToUser(topicData.ChatID, supportMsg.Payload, bot)
 	} else {
 		return fmt.Errorf("couldn't find the topic %d from the support message %s", supportMsg.TopicID, supportMsg.Payload)
 	}
@@ -181,16 +176,9 @@ func (support *Support) transferMessageToTopic(topicID int, telegramMessage enti
 	return err
 }
 
-func (support *Support) transferMessageToUser(chatID int64, payload string, bot *bot.Bot, messageID int, schat *telebot.Chat) error {
-	msg := &telebot.Message{
-		ID: messageID, 
-		Chat: schat}
-	edMessage, _ := bot.EditMessage(msg, "")
-	if edMessage != nil {
+func (support *Support) transferMessageToUser(chatID int64, payload string, bot *bot.Bot) error {
 	_, err := bot.Send(telebot.ChatID(chatID), payload, &telebot.SendOptions{})
 	return err
-	}
-	return nil
 }
 
 func (support *Support) createTopic(telegramMessage entity.UserMessage, bot *bot.Bot, supportChat *telebot.Chat) error {
