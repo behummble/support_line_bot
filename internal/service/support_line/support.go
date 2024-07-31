@@ -244,6 +244,7 @@ func (support *Support) deleteTopicsInService() {
 	bots := make(map[string]*bot.Bot)
 	groupChats := make(map[int64]*telebot.Chat)
 	var waitGroup sync.WaitGroup
+	var mutex sync.Mutex
 
 	support.log.Info(fmt.Sprintf("The number of topics to delete: %d", len(keys)))
 
@@ -270,13 +271,15 @@ func (support *Support) deleteTopicsInService() {
 				support.log.Error("Can`t parse topic data from json", "Error", err)
 				return
 			}
-			
+
+			mutex.Lock()
 			if _, ok := bots[topicData.BotToken]; !ok {
 				bot, err := bot.NewWithoutDecryption(support.log, topicData.BotToken, support.timeout)
 				if err != nil {
 					support.log.Error("Can`t initialize bot in sheduling delete topics", "Error", err)
 					return
 				}
+				
 				bots[topicData.BotToken] = bot
 			}
 			bot := bots[topicData.BotToken]
@@ -290,7 +293,8 @@ func (support *Support) deleteTopicsInService() {
 				groupChats[topicData.GroupChatID] = supportChat
 			}
 			supportChat := groupChats[topicData.GroupChatID]
-			
+			mutex.Unlock()
+
 			teleTopic := &telebot.Topic {
 				ThreadID: topicData.TopicID,
 			}
